@@ -1,4 +1,3 @@
-
 # Install Kubernetes Cluster (kubeadm) on RHEL 10
 
 ```
@@ -319,6 +318,53 @@ kubectl delete deploy,svc web
 ```
 
 > Take a VMware snapshot of all nodes now, so you can always roll back to a working cluster.
+
+---
+
+## Part 8 – Power Off and Power On the Cluster
+
+Always shut down the **workers first** and the **master last**. Start in the reverse order.
+
+> **Note:** Use **Shut Down Guest** in VMware, not **Power Off**. Power Off is like pulling the plug and can corrupt etcd on the master.
+
+### Power Off
+
+Drain the worker nodes (optional but clean)
+
+```bash
+kubectl drain k8s-worker1.ops.lab --ignore-daemonsets --delete-emptydir-data
+kubectl drain k8s-worker2.ops.lab --ignore-daemonsets --delete-emptydir-data
+```
+
+Shut down the workers, then the master
+
+```bash
+ssh root@k8s-worker1.ops.lab 'poweroff'
+ssh root@k8s-worker2.ops.lab 'poweroff'
+sleep 30
+ssh root@k8s-master.ops.lab 'poweroff'
+```
+
+### Power On
+
+Start **k8s-master** first and wait 1–2 minutes for the API server and etcd to come up. Then start **k8s-worker1** and **k8s-worker2**.
+
+Check the nodes and uncordon the workers (if they were drained)
+
+```bash
+kubectl get nodes
+kubectl uncordon k8s-worker1.ops.lab k8s-worker2.ops.lab
+kubectl get pods -A
+```
+
+All nodes should return to `Ready` within a couple of minutes. kubelet and CRI-O start automatically at boot.
+
+> **Certificates:** kubeadm certificates are valid for 1 year. If the cluster was powered off for a long time and kubectl gives certificate errors, run on the master:
+>
+> ```bash
+> kubeadm certs check-expiration
+> kubeadm certs renew all
+> ```
 
 ---
 
